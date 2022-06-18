@@ -60,44 +60,34 @@ int main(int argc, char **argv) {
   Type* structType = nullptr;
   Function* addFunction = nullptr;
   Function* pushConstFunction = nullptr;
-  {
-    auto context = std::make_unique<LLVMContext>();
-    SMDiagnostic err;
-    auto vmModule = parseIRFile("vm.ll", err, *context);
-    if (!vmModule) {
-      err.print(argv[0], errs());
-      return 1;
-    }
 
-    // for (const auto& f : vmModule->getFunctionList()) {
-    //   std::cout << f.getName().str() << std::endl;
-    // }
+  auto context = std::make_unique<LLVMContext>();
+  SMDiagnostic err;
+  auto vmModule = parseIRFile("vm.ll", err, *context);
+  if (!vmModule) {
+    err.print(argv[0], errs());
+    return 1;
+  }
 
-    structType = StructType::getTypeByName(*context, "struct.State");
-    if (structType == nullptr) {
-      errs() << "struct.State was not found in vm.ll module\n";
-      return 1;
-    }
+  structType = StructType::getTypeByName(*context, "struct.State");
+  if (structType == nullptr) {
+    errs() << "struct.State was not found in vm.ll module\n";
+    return 1;
+  }
 
-    addFunction = vmModule->getFunction("_Z3addP5State");
-    if (addFunction == nullptr) {
-      errs() << "_Z3addP5State was not found in vm.ll module\n";
-      return 1;
-    }
+  addFunction = vmModule->getFunction("_Z3addP5State");
+  if (addFunction == nullptr) {
+    errs() << "_Z3addP5State was not found in vm.ll module\n";
+    return 1;
+  }
 
-    pushConstFunction = vmModule->getFunction("_Z9pushConstP5Stateh");
-    if (pushConstFunction == nullptr) {
-      errs() << "_Z9pushConstP5Stateh was not found in vm.ll module\n";
-      return 1;
-    }
-
-    auto tsm = ThreadSafeModule(std::move(vmModule), std::move(context));
-    ExitOnErr(jit->addModule(std::move(tsm)));
+  pushConstFunction = vmModule->getFunction("_Z9pushConstP5Stateh");
+  if (pushConstFunction == nullptr) {
+    errs() << "_Z9pushConstP5Stateh was not found in vm.ll module\n";
+    return 1;
   }
 
   {
-    auto context = std::make_unique<LLVMContext>();
-    auto mainModule = std::make_unique<Module>("my cool jit", *context);
     auto builder = std::make_unique<IRBuilder<>>(*context);
 
     std::vector<Type*> arguments;
@@ -113,7 +103,7 @@ int main(int argc, char **argv) {
       functionType,
       Function::ExternalLinkage,
       "__anon_expr",
-      mainModule.get()
+      vmModule.get()
     );
     auto& stateArg = *function->args().begin();
     stateArg.setName("state");
@@ -127,22 +117,6 @@ int main(int argc, char **argv) {
     Value* stateAllocaValue = stateAlloca;
 
     {
-      // std::vector<Type*> arguments;
-      // arguments.push_back(structType->getPointerTo());
-
-      // FunctionType* functionType = FunctionType::get(
-      //   Type::getVoidTy(*context) /* Return type */,
-      //   arguments,
-      //   false /* is var arg */
-      // );
-
-      // Function* function = Function::Create(
-      //   functionType,
-      //   Function::ExternalLinkage,
-      //   "add",
-      //   mainModule.get()
-      // );
-
       {
         std::vector<Value*> argumentValues;
         argumentValues.push_back(builder->CreateLoad(stateAllocaValue, stateArg.getName()));
@@ -178,25 +152,23 @@ int main(int argc, char **argv) {
     builder->CreateRet(nullptr);
 
     verifyFunction(*function);
-
-    for (const auto& f : mainModule->getFunctionList()) {
-      std::cout << f.getName().str() << std::endl;
-    }
-
-    errs() << *mainModule;
-
-    auto tsm = ThreadSafeModule(std::move(mainModule), std::move(context));
-    ExitOnErr(jit->addModule(std::move(tsm)));
   }
+
+  for (const auto& f : vmModule->getFunctionList()) {
+    std::cout << f.getName().str() << std::endl;
+  }
+
+  errs() << *vmModule;
+
+  auto tsm = ThreadSafeModule(std::move(vmModule), std::move(context));
+  ExitOnErr(jit->addModule(std::move(tsm)));
 
   {
     State state;
-    // pushConst(&state, 1);
-    // pushConst(&state, 2);
 
     jit->ES->dump(errs());
 
-    auto symbol = ExitOnErr(jit->lookup("__anon_expr", false));
+    auto symbol = ExitOnErr(jit->lookup("__anon_expr"));
     auto *fp = (void (*)(State*))(intptr_t)symbol.getAddress();
     fp(&state);
 
