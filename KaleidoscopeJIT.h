@@ -31,7 +31,7 @@ namespace llvm {
 namespace orc {
 
 class KaleidoscopeJIT {
-private:
+public:
   std::unique_ptr<TargetProcessControl> TPC;
   std::unique_ptr<ExecutionSession> ES;
 
@@ -92,8 +92,11 @@ public:
     return CompileLayer.add(RT, std::move(TSM));
   }
 
-  Expected<JITEvaluatedSymbol> lookup(StringRef Name) {
-    return ES->lookup({&MainJD}, Mangle(Name.str()));
+  Expected<JITEvaluatedSymbol> lookup(StringRef Name, bool mangle = true) {
+    if (mangle) {
+      return ES->lookup({&MainJD}, Mangle(Name.str()));
+    }
+    return ES->lookup({&MainJD}, Name.str());
   }
 };
 
