@@ -29,7 +29,7 @@
 #include <vector>
 #include <iostream>
 
-#include "vm.cpp"
+#include "vm.h"
 
 using namespace llvm;
 using namespace llvm::orc;
@@ -154,19 +154,23 @@ int main(int argc, char **argv) {
     verifyFunction(*function);
   }
 
+  errs() << "Code was compiled into module.\n";
+  errs() << "Functions defined in the module:\n";
   for (const auto& f : vmModule->getFunctionList()) {
-    std::cout << f.getName().str() << std::endl;
+    errs() << " - " << f.getName().str() << "\n";
   }
-
-  errs() << *vmModule;
+  // errs() << "Compiled module:\n";
+  // errs() << *vmModule;
 
   auto tsm = ThreadSafeModule(std::move(vmModule), std::move(context));
   ExitOnErr(jit->addModule(std::move(tsm)));
 
+  errs() << "Module was JIT'd.\n";
+  errs() << "Execution state:\n";
+  jit->ES->dump(errs());
+
   {
     State state;
-
-    jit->ES->dump(errs());
 
     auto symbol = ExitOnErr(jit->lookup("__anon_expr"));
     auto *fp = (void (*)(State*))(intptr_t)symbol.getAddress();

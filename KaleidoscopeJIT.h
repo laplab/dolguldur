@@ -19,12 +19,24 @@
 #include "llvm/ExecutionEngine/Orc/Core.h"
 #include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
 #include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
+#include "llvm/ExecutionEngine/Orc/IRTransformLayer.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
 #include "llvm/ExecutionEngine/Orc/TargetProcessControl.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/LLVMContext.h"
+
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Support/raw_ostream.h"
+
+#include "llvm/Analysis/LoopAnalysisManager.h"
+#include "llvm/Analysis/CGSCCPassManager.h"
+#include "llvm/Passes/PassBuilder.h"
+
 #include <memory>
 
 namespace llvm {
@@ -40,6 +52,7 @@ public:
 
   RTDyldObjectLinkingLayer ObjectLayer;
   IRCompileLayer CompileLayer;
+  IRTransformLayer OptimizeLayer;
 
   JITDylib &MainJD;
 
@@ -53,6 +66,7 @@ public:
                     []() { return std::make_unique<SectionMemoryManager>(); }),
         CompileLayer(*this->ES, ObjectLayer,
                      std::make_unique<ConcurrentIRCompiler>(std::move(JTMB))),
+        OptimizeLayer(*this->ES, CompileLayer, optimizeModule),
         MainJD(this->ES->createBareJITDylib("<main>")) {
     MainJD.addGenerator(
         cantFail(DynamicLibrarySearchGenerator::GetForCurrentProcess(
@@ -89,14 +103,50 @@ public:
   Error addModule(ThreadSafeModule TSM, ResourceTrackerSP RT = nullptr) {
     if (!RT)
       RT = MainJD.getDefaultResourceTracker();
-    return CompileLayer.add(RT, std::move(TSM));
+
+    return OptimizeLayer.add(RT, std::move(TSM));
   }
 
-  Expected<JITEvaluatedSymbol> lookup(StringRef Name, bool mangle = true) {
-    if (mangle) {
-      return ES->lookup({&MainJD}, Mangle(Name.str()));
-    }
-    return ES->lookup({&MainJD}, Name.str());
+  Expected<JITEvaluatedSymbol> lookup(StringRef Name) {
+    return ES->lookup({&MainJD}, Mangle(Name.str()));
+  }
+
+private:
+  static Expected<ThreadSafeModule>
+  optimizeModule(ThreadSafeModule TSM, const MaterializationResponsibility &R) {
+    TSM.withModuleDo([](Module &M) {
+      errs() << "Module before optimization:\n" << M;
+
+      // Create the analysis managers.
+      LoopAnalysisManager LAM;
+      FunctionAnalysisManager FAM;
+      CGSCCAnalysisManager CGAM;
+      ModuleAnalysisManager MAM;
+
+      // Create the new pass manager builder.
+      // Take a look at the PassBuilder constructor parameters for more
+      // customization, e.g. specifying a TargetMachine or various debugging
+      // options.
+      PassBuilder PB;
+
+      // Register all the basic analyses with the managers.
+      PB.registerModuleAnalyses(MAM);
+      PB.registerCGSCCAnalyses(CGAM);
+      PB.registerFunctionAnalyses(FAM);
+      PB.registerLoopAnalyses(LAM);
+      PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+      // Create the pass manager.
+      // This one corresponds to a typical -O3 optimization pipeline.
+      ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(PassBuilder::OptimizationLevel::O3);
+
+      // Optimize the IR!
+      MPM.run(M, MAM);
+
+      errs() << "Module after optimization:\n" << M;
+    });
+
+    return std::move(TSM);
   }
 };
 
