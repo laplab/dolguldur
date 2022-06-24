@@ -1,4 +1,5 @@
 #include <cstdint>
+#include "lib.h"
 
 struct State {
     int32_t current = 0;
@@ -6,6 +7,7 @@ struct State {
 };
 
 __attribute__((always_inline)) void pushConst(State* state, uint8_t constant) {
+    debugPrint(constant);
     state->stack[state->current++] = constant;
 }
 

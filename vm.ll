@@ -5,8 +5,9 @@ target triple = "x86_64-apple-macosx10.15.0"
 
 %struct.State = type { i32, [100 x i8] }
 
-; Function Attrs: alwaysinline nofree norecurse nounwind ssp uwtable willreturn mustprogress
+; Function Attrs: alwaysinline ssp uwtable mustprogress
 define dso_local void @_Z9pushConstP5Stateh(%struct.State* nocapture %0, i8 zeroext %1) local_unnamed_addr #0 {
+  tail call void @_Z10debugPrinth(i8 zeroext %1)
   %3 = getelementptr inbounds %struct.State, %struct.State* %0, i64 0, i32 0
   %4 = load i32, i32* %3, align 4, !tbaa !3
   %5 = add nsw i32 %4, 1
@@ -17,8 +18,10 @@ define dso_local void @_Z9pushConstP5Stateh(%struct.State* nocapture %0, i8 zero
   ret void
 }
 
+declare void @_Z10debugPrinth(i8 zeroext) local_unnamed_addr #1
+
 ; Function Attrs: alwaysinline nofree norecurse nounwind ssp uwtable willreturn mustprogress
-define dso_local void @_Z3addP5State(%struct.State* nocapture %0) local_unnamed_addr #0 {
+define dso_local void @_Z3addP5State(%struct.State* nocapture %0) local_unnamed_addr #2 {
   %2 = getelementptr inbounds %struct.State, %struct.State* %0, i64 0, i32 0
   %3 = load i32, i32* %2, align 4, !tbaa !3
   %4 = add nsw i32 %3, -1
@@ -35,7 +38,9 @@ define dso_local void @_Z3addP5State(%struct.State* nocapture %0) local_unnamed_
   ret void
 }
 
-attributes #0 = { alwaysinline nofree norecurse nounwind ssp uwtable willreturn mustprogress "disable-tail-calls"="false" "frame-pointer"="all" "less-precise-fpmad"="false" "min-legal-vector-width"="0" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="penryn" "target-features"="+cx16,+cx8,+fxsr,+mmx,+sahf,+sse,+sse2,+sse3,+sse4.1,+ssse3,+x87" "tune-cpu"="generic" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #0 = { alwaysinline ssp uwtable mustprogress "disable-tail-calls"="false" "frame-pointer"="all" "less-precise-fpmad"="false" "min-legal-vector-width"="0" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="penryn" "target-features"="+cx16,+cx8,+fxsr,+mmx,+sahf,+sse,+sse2,+sse3,+sse4.1,+ssse3,+x87" "tune-cpu"="generic" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #1 = { "disable-tail-calls"="false" "frame-pointer"="all" "less-precise-fpmad"="false" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="penryn" "target-features"="+cx16,+cx8,+fxsr,+mmx,+sahf,+sse,+sse2,+sse3,+sse4.1,+ssse3,+x87" "tune-cpu"="generic" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #2 = { alwaysinline nofree norecurse nounwind ssp uwtable willreturn mustprogress "disable-tail-calls"="false" "frame-pointer"="all" "less-precise-fpmad"="false" "min-legal-vector-width"="0" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="penryn" "target-features"="+cx16,+cx8,+fxsr,+mmx,+sahf,+sse,+sse2,+sse3,+sse4.1,+ssse3,+x87" "tune-cpu"="generic" "unsafe-fp-math"="false" "use-soft-float"="false" }
 
 !llvm.module.flags = !{!0, !1}
 !llvm.ident = !{!2}
